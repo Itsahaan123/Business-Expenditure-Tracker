@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Expenditure Tracker</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        table, th, td { border: 1px solid #ddd; padding: 8px; }
+        th { background-color: #f2f2f2; text-align: left; }
+        .container { max-width: 800px; margin: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Business Expenditure Tracker</h2>
+        <div>
+            <label>Total Bank Balance: </label><span id="total-balance">0</span>
+        </div>
+        <form id="expenditure-form">
+            <input type="date" id="date" required>
+            <input type="text" id="description" placeholder="Description" required>
+            <select id="transaction_type">
+                <option value="debited">Debited</option>
+                <option value="credited">Credited</option>
+            </select>
+            <input type="number" id="amount" placeholder="Amount" step="0.01" required>
+            <button type="submit">Add Record</button>
+        </form>
+        <br>
+        <table id="records-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Transaction Type</th>
+                    <th>Amount</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <button onclick="exportCSV()">Export as CSV</button>
+    </div>
+
+    <script>
+        let editRecordId = null;
+
+        async function fetchRecords() {
+            const response = await fetch('/get_records');
+            const data = await response.json();
+            document.getElementById('total-balance').textContent = data.total_balance;
+
+            const tableBody = document.getElementById('records-table').getElementsByTagName('tbody')[0];
+            tableBody.innerHTML = '';
+            data.records.forEach(record => {
+                const row = tableBody.insertRow();
+                row.innerHTML = `
+                    <td>${record.date}</td>
+                    <td>${record.description}</td>
+                    <td>${record.transaction_type}</td>
+                    <td>${record.amount}</td>
+                    <td>
+                        <button onclick="editRecord(${record.id}, '${record.date}', '${record.description}', '${record.transaction_type}', ${record.amount})">Edit</button>
+                        <button onclick="deleteRecord(${record.id})">Delete</button>
+                    </td>
+                `;
+            });
+        }
+
+        async function addRecord(event) {
+            event.preventDefault();
+            const date = document.getElementById('date').value;
+            const description = document.getElementById('description').value;
+            const transaction_type = document.getElementById('transaction_type').value;
+            const amount = document.getElementById('amount').value;
+
+            const url = editRecordId ? `/update_record/${editRecordId}` : '/add_record';
+            const method = editRecordId ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date, description, transaction_type, amount })
+            });
+
+            if (response.ok) {
+                fetchRecords();
+                document.getElementById('expenditure-form').reset();
+                editRecordId = null;
+            }
+        }
+
+        function editRecord(id, date, description, transaction_type, amount) {
+            editRecordId = id;
+            document.getElementById('date').value = date;
+            document.getElementById('description').value = description;
+            document.getElementById('transaction_type').value = transaction_type;
+            document.getElementById('amount').value = amount;
+        }
+
+        async function deleteRecord(id) {
+            const response = await fetch(`/delete_record/${id}`, { method: 'DELETE' });
+            if (response.ok) {
+                fetchRecords();
+            }
+        }
+
+        async function exportCSV() {
+            window.location.href = '/export_csv';
+        }
+
+        document.getElementById('expenditure-form').addEventListener('submit', addRecord);
+
+        fetchRecords();
+    </script>
+</body>
+</html>
